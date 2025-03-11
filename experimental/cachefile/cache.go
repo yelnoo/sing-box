@@ -17,6 +17,7 @@ import (
 	"github.com/sagernet/sing/common"
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/logger"
+	"github.com/sagernet/sing/service"
 	"github.com/sagernet/sing/service/filemanager"
 )
 
@@ -25,6 +26,7 @@ var (
 	bucketExpand   = []byte("group_expand")
 	bucketMode     = []byte("clash_mode")
 	bucketRuleSet  = []byte("rule_set")
+	bucketProvider = []byte("provider")
 
 	bucketNameList = []string{
 		string(bucketSelected),
@@ -33,6 +35,7 @@ var (
 		string(bucketRuleSet),
 		string(bucketRDRC),
 		string(bucketDNSCache),
+		string(bucketProvider),
 	}
 
 	cacheIDDefault = []byte("default")
@@ -158,6 +161,14 @@ func (c *CacheFile) startCacheCleanup() {
 			interval = time.Hour
 		}
 		go c.loopCacheCleanup(interval, c.cleanupRDRC)
+	}
+	providerManager := service.FromContext[adapter.ProviderManager](c.ctx)
+	if providerManager != nil {
+		for _, tag := range c.getAllSubscriptionTags() {
+			if _, isExist := providerManager.Get(tag); !isExist {
+				c.clearSubscription(tag)
+			}
+		}
 	}
 }
 
@@ -414,4 +425,68 @@ func (c *CacheFile) SaveRuleSet(tag string, set *adapter.SavedBinary) error {
 		}
 		return bucket.Put([]byte(tag), setBinary)
 	})
+}
+
+func (c *CacheFile) LoadSubscription(tag string) *adapter.SavedBinary {
+	var savedSet adapter.SavedBinary
+	err := c.DB.View(func(t *bbolt.Tx) error {
+		bucket := c.bucket(t, bucketProvider)
+		if bucket == nil {
+			return os.ErrNotExist
+		}
+		setBinary := bucket.Get([]byte(tag))
+		if len(setBinary) == 0 {
+			return os.ErrInvalid
+		}
+		return savedSet.UnmarshalBinary(setBinary)
+	})
+	if err != nil {
+		return nil
+	}
+	return &savedSet
+}
+
+func (c *CacheFile) SaveSubscription(tag string, sub *adapter.SavedBinary) error {
+	return c.DB.Batch(func(t *bbolt.Tx) error {
+		bucket, err := c.createBucket(t, bucketProvider)
+		if err != nil {
+			return err
+		}
+		setBinary, err := sub.MarshalBinary()
+		if err != nil {
+			return err
+		}
+		return bucket.Put([]byte(tag), setBinary)
+	})
+}
+
+func (c *CacheFile) clearSubscription(tag string) error {
+	return c.DB.Batch(func(t *bbolt.Tx) error {
+		bucket := c.bucket(t, bucketProvider)
+		if bucket == nil {
+			return nil
+		}
+		setBinary := bucket.Get([]byte(tag))
+		if len(setBinary) == 0 {
+			return nil
+		}
+		return bucket.Delete([]byte(tag))
+	})
+}
+
+func (c *CacheFile) getAllSubscriptionTags() []string {
+	tags := []string{}
+	_ = c.DB.View(func(t *bbolt.Tx) error {
+		bucket := c.bucket(t, bucketProvider)
+		if bucket == nil {
+			return nil
+		}
+		return bucket.ForEach(func(k, v []byte) error {
+			if len(k) > 0 {
+				tags = append(tags, string(k))
+			}
+			return nil
+		})
+	})
+	return tags
 }
