@@ -1,0 +1,157 @@
+name: Build Core
+
+on:
+  push:
+  workflow_dispatch:
+
+env:
+  TAGS: with_gvisor,with_dhcp,with_wireguard,with_clash_api,with_quic,with_utls,with_tailscale
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      go-version: ${{ steps.go.outputs.go-version }}
+      sing-box-version: ${{ steps.set-var.outputs.sing-box-version }}
+      telegram-ready: ${{ steps.set-var.outputs.telegram-ready }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        id: go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Setup Variables
+        id: set-var
+        run: |
+          echo sing-box-version=$(CGO_ENABLED=0 GOOS="linux" GOARCH="amd64" go run ./cmd/internal/read_tag) >> $GITHUB_OUTPUT
+          if [[ -n $API_HASH && -n $API_ID && -n $BOT_TOKEN && -n $CHAT_ID ]]; then
+            echo telegram-ready=true >> $GITHUB_OUTPUT
+          fi
+        env:
+          API_HASH: ${{ secrets.API_HASH }}
+          API_ID: ${{ secrets.API_ID }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+
+  build:
+    runs-on: ubuntu-latest
+    needs: prepare
+    strategy:
+      matrix:
+        include:
+          # windows
+          - name: windows-amd64
+            goos: windows
+            goarch: amd64
+            goamd64: v1
+
+          # linux
+          - name: linux-amd64
+            goos: linux
+            goarch: amd64
+            goamd64: v1
+
+          # darwin
+          - name: darwin-amd64
+            goos: darwin
+            goarch: amd64
+            goamd64: v1
+
+          # android
+          - name: android-arm64
+            goos: android
+            goarch: arm64
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Setup NDK
+        if: matrix.goos == 'android'
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r28
+
+      - name: Build
+        env:
+          CGO_ENABLED: 0
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOAMD64: ${{ matrix.goamd64 }}
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          VERSION: ${{ needs.prepare.outputs.sing-box-version }}
+        run: |
+          if [[ ${GOOS} == "android" ]]; then
+            export CGO_ENABLED=1
+            export CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang
+          fi
+          go build -v -trimpath -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${VERSION}' -s -w -buildid=" -tags ${TAGS} ./cmd/sing-box
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sing-box-${{ matrix.name }}
+          path: sing-box*
+
+  post:
+    runs-on: ubuntu-latest
+    needs: 
+      - build
+      - prepare
+    if: ${{ needs.prepare.outputs.telegram-ready == 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Rename and Remove Directory
+        run: |
+          mv sing-box-windows-amd64/sing-box.exe sing-box_windows_amd64.exe
+          mv sing-box-linux-amd64/sing-box sing-box_linux_amd64
+          mv sing-box-darwin-amd64/sing-box sing-box_darwin_amd64
+          mv sing-box-android-arm64/sing-box sing-box_android_arm64
+          find . -maxdepth 1 -type d -empty -delete
+      
+      - name: Prepare context
+        id: prepare-context
+        env:
+          SING_BOX_VERSION: ${{ needs.prepare.outputs.sing-box-version }}
+          GO_VERSION: ${{ needs.prepare.outputs.go-version }}
+        run: |
+          {
+            echo 'CONTEXT<<EOF'
+            echo -e "sing-box v${SING_BOX_VERSION}\n\n🛠️ Built with Go v${GO_VERSION}\n\n🏷️ Tags: ${TAGS}\n\n✨ Commit:\n$(git log --pretty=format:"%an- %s" | sed -e 's/^yelnoo/  /; t; d; q')"
+            echo EOF
+          } >> $GITHUB_OUTPUT
+
+      - name: Send to Telegram
+        uses: xireiki/channel-post@v1
+        with: 
+          chat_id: ${{ secrets.CHAT_ID }}
+          bot_token: ${{ secrets.BOT_TOKEN }}
+          path: sing-box_*
+          context: ${{ steps.prepare-context.outputs.CONTEXT }}
+          parse_mode: HTML
+          large_file: true
+          api_id: ${{ secrets.API_ID }}
+          api_hash: ${{ secrets.API_HASH }}
+          method: sendFile
