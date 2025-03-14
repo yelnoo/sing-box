@@ -377,6 +377,8 @@ func ParseClashSubscription(_ context.Context, content string) ([]option.Outboun
 			outbound, err = parseHysteriaClash(proxy)
 		case "hysteria2":
 			outbound, err = parseHysteria2Clash(proxy)
+		case "anytls":
+		  outbound, err = parseAnyTLSClash(proxy)
 		default:
 			continue
 		}
@@ -923,6 +925,30 @@ func parseHysteria2Clash(proxy map[string]any) (option.Outbound, error) {
 		}
 		options.TLS.Certificate = caStrArr
 	}
+	options.DialerOptions = convertDialerOption(proxy)
+	outbound.Options = &options
+	return outbound, nil
+}
+
+func parseAnyTLSClash(proxy map[string]any) (option.Outbound, error) {
+	outbound := option.Outbound{
+		Type: C.TypeAnyTLS,
+	}
+	options := option.AnyTLSOutboundOptions{}
+	if name, exists := proxy["name"].(string); exists {
+		outbound.Tag = name
+	}
+	if server, exists := proxy["server"].(string); exists {
+		options.Server = server
+	}
+	if port, exists := proxy["port"]; exists {
+		options.ServerPort = stringToUint16(fmt.Sprint(port))
+	}
+	if password, exists := proxy["password"].(string); exists {
+		options.Password = password
+	}
+	options.TLS = convertTLSOptions(proxy)
+	options.TLS.Enabled = true
 	options.DialerOptions = convertDialerOption(proxy)
 	outbound.Options = &options
 	return outbound, nil
