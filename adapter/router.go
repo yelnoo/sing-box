@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	C "github.com/sagernet/sing-box/constant"
 	M "github.com/sagernet/sing/common/metadata"
@@ -22,6 +23,7 @@ type Router interface {
 	PreMatch(metadata InboundContext) error
 	ConnectionRouterEx
 	RuleSet(tag string) (RuleSet, bool)
+	RuleSets() []RuleSet
 	NeedWIFIState() bool
 	Rules() []Rule
 	AppendTracker(tracker ConnectionTracker)
@@ -47,6 +49,10 @@ type ConnectionRouterEx interface {
 
 type RuleSet interface {
 	Name() string
+	Type() string
+	Format() string
+	RuleCount() uint64
+	UpdatedAt() time.Time
 	StartContext(ctx context.Context, startContext *HTTPStartContext) error
 	PostStart() error
 	Metadata() RuleSetMetadata
