@@ -43,3 +43,14 @@ const (
 	RuleActionRejectMethodDrop    = "drop"
 	RuleActionRejectMethodReply   = "reply"
 )
+
+func RuleSetFormatDisplayName(format string) string {
+	switch format {
+	case RuleSetFormatSource:
+		return "Source"
+	case RuleSetFormatBinary:
+		return "Binary"
+	default:
+		return "Unknown"
+	}
+}

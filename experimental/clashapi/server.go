@@ -18,7 +18,6 @@ import (
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/experimental"
 	"github.com/sagernet/sing-box/experimental/clashapi/trafficontrol"
-	"github.com/sagernet/sing-box/experimental/libbox/platform"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing/common"
@@ -126,13 +125,13 @@ func NewServer(ctx context.Context, logFactory log.ObservableFactory, options op
 		r.Mount("/rules", ruleRouter(s.router))
 		r.Mount("/connections", connectionRouter(s.router, trafficManager))
 		r.Mount("/providers/proxies", proxyProviderRouter(s))
-		r.Mount("/providers/rules", ruleProviderRouter())
+		r.Mount("/providers/rules", ruleProviderRouter(s.router))
 		r.Mount("/script", scriptRouter())
 		r.Mount("/profile", profileRouter())
 		r.Mount("/cache", cacheRouter(ctx))
 		r.Mount("/dns", dnsRouter(s.dnsRouter))
 
-		if service.FromContext[platform.Interface](ctx) == nil {
+		if service.FromContext[adapter.PlatformInterface](ctx) == nil {
 			r.Mount("/restart", restartRouter(ctx, logFactory))
 		}
 
