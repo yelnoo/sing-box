@@ -29,7 +29,7 @@ func FindProcessInfo(searcher Searcher, ctx context.Context, network string, sou
 	if err != nil {
 		return nil, err
 	}
-	if info.UserId != -1 {
+	if info.UserId != -1 && info.UserName == "" {
 		osUser, _ := user.LookupId(F.ToString(info.UserId))
 		if osUser != nil {
 			info.UserName = osUser.Username
