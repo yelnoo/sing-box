@@ -2,6 +2,10 @@
 icon: material/alert-decagram
 ---
 
+#### 1.13.4
+
+* Fixes and improvements
+
 #### 1.13.3
 
 * Add OpenWrt and Alpine APK packages to release **1**
