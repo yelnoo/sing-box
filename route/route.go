@@ -426,8 +426,8 @@ func (r *Router) matchRule(
 				} else {
 					r.logger.InfoContext(ctx, "found process path: ", processInfo.ProcessPath)
 				}
-			} else if processInfo.AndroidPackageName != "" {
-				r.logger.InfoContext(ctx, "found package name: ", processInfo.AndroidPackageName)
+			} else if len(processInfo.AndroidPackageNames) > 0 {
+				r.logger.InfoContext(ctx, "found package name: ", strings.Join(processInfo.AndroidPackageNames, ", "))
 			} else if processInfo.UserId != -1 {
 				if processInfo.UserName != "" {
 					r.logger.InfoContext(ctx, "found user: ", processInfo.UserName)

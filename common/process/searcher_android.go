@@ -6,6 +6,7 @@ import (
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-tun"
+	"github.com/sagernet/sing/common"
 )
 
 var _ Searcher = (*androidSearcher)(nil)
@@ -31,17 +32,17 @@ func (s *androidSearcher) FindProcessInfo(ctx context.Context, network string, s
 	if err != nil {
 		return nil, err
 	}
-	if sharedPackage, loaded := s.packageManager.SharedPackageByID(uid % 100000); loaded {
-		return &adapter.ConnectionOwner{
-			UserId:             int32(uid),
-			AndroidPackageName: sharedPackage,
-		}, nil
+	appID := uid % 100000
+	var packageNames []string
+	if sharedPackage, loaded := s.packageManager.SharedPackageByID(appID); loaded {
+		packageNames = append(packageNames, sharedPackage)
 	}
-	if packageName, loaded := s.packageManager.PackageByID(uid % 100000); loaded {
-		return &adapter.ConnectionOwner{
-			UserId:             int32(uid),
-			AndroidPackageName: packageName,
-		}, nil
+	if packages, loaded := s.packageManager.PackagesByID(appID); loaded {
+		packageNames = append(packageNames, packages...)
 	}
-	return &adapter.ConnectionOwner{UserId: int32(uid)}, nil
+	packageNames = common.Uniq(packageNames)
+	return &adapter.ConnectionOwner{
+		UserId:              int32(uid),
+		AndroidPackageNames: packageNames,
+	}, nil
 }
