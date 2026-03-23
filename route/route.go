@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
-	"github.com/sagernet/sing-box/common/process"
 	"github.com/sagernet/sing-box/common/sniff"
 	C "github.com/sagernet/sing-box/constant"
 	R "github.com/sagernet/sing-box/route/rule"
@@ -415,7 +414,7 @@ func (r *Router) matchRule(
 		} else if metadata.Destination.IsIP() {
 			originDestination = metadata.Destination.AddrPort()
 		}
-		processInfo, fErr := process.FindProcessInfo(r.processSearcher, ctx, metadata.Network, metadata.Source.AddrPort(), originDestination)
+		processInfo, fErr := r.findProcessInfoCached(ctx, metadata.Network, metadata.Source.AddrPort(), originDestination)
 		if fErr != nil {
 			r.logger.InfoContext(ctx, "failed to search process: ", fErr)
 		} else {
