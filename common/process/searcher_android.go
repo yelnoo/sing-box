@@ -18,8 +18,16 @@ func NewSearcher(config Config) (Searcher, error) {
 	return &androidSearcher{config.PackageManager}, nil
 }
 
+func (s *androidSearcher) Close() error {
+	return nil
+}
+
 func (s *androidSearcher) FindProcessInfo(ctx context.Context, network string, source netip.AddrPort, destination netip.AddrPort) (*adapter.ConnectionOwner, error) {
-	_, uid, err := resolveSocketByNetlink(network, source, destination)
+	family, protocol, err := socketDiagSettings(network, source)
+	if err != nil {
+		return nil, err
+	}
+	_, uid, err := querySocketDiagOnce(family, protocol, source)
 	if err != nil {
 		return nil, err
 	}

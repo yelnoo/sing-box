@@ -196,6 +196,13 @@ func (r *Router) Close() error {
 		})
 		monitor.Finish()
 	}
+	if r.processSearcher != nil {
+		monitor.Start("close process searcher")
+		err = E.Append(err, r.processSearcher.Close(), func(err error) error {
+			return E.Cause(err, "close process searcher")
+		})
+		monitor.Finish()
+	}
 	return err
 }
 

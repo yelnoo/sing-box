@@ -24,6 +24,10 @@ func NewSearcher(_ Config) (Searcher, error) {
 	return &darwinSearcher{}, nil
 }
 
+func (d *darwinSearcher) Close() error {
+	return nil
+}
+
 func (d *darwinSearcher) FindProcessInfo(ctx context.Context, network string, source netip.AddrPort, destination netip.AddrPort) (*adapter.ConnectionOwner, error) {
 	processName, err := findProcessName(network, source.Addr(), int(source.Port()))
 	if err != nil {
