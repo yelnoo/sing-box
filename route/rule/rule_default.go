@@ -47,6 +47,10 @@ type DefaultRule struct {
 	abstractDefaultRule
 }
 
+func (r *DefaultRule) matchStates(metadata *adapter.InboundContext) ruleMatchStateSet {
+	return r.abstractDefaultRule.matchStates(metadata)
+}
+
 type RuleItem interface {
 	Match(metadata *adapter.InboundContext) bool
 	String() string
@@ -275,7 +279,7 @@ func NewDefaultRule(ctx context.Context, logger log.ContextLogger, options optio
 			matchSource = true
 		}
 		item := NewRuleSetItem(router, options.RuleSet, matchSource, false)
-		rule.items = append(rule.items, item)
+		rule.ruleSetItem = item
 		rule.allItems = append(rule.allItems, item)
 	}
 	return rule, nil
@@ -285,6 +289,10 @@ var _ adapter.Rule = (*LogicalRule)(nil)
 
 type LogicalRule struct {
 	abstractLogicalRule
+}
+
+func (r *LogicalRule) matchStates(metadata *adapter.InboundContext) ruleMatchStateSet {
+	return r.abstractLogicalRule.matchStates(metadata)
 }
 
 func NewLogicalRule(ctx context.Context, logger log.ContextLogger, options option.LogicalRule) (*LogicalRule, error) {
